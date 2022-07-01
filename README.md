@@ -4,7 +4,7 @@
 
 A simple FCI (full configuration interaction) implementation in Python.
 Use the Slater-Condon rule to evaluate the Hamiltonian within the Slater 
-determinant basis ($S_z$ eigen states), with the MOs and ingterals generated
+determinant basis ($S_z$ eigen states), with the MOs and integrals generated
 from `pyscf`; then directly diagonalize it using `numpy`.
 
 ## TODO:
