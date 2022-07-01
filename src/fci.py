@@ -29,13 +29,6 @@ def get_hamiltonian(mol: pyscf.gto.Mole):
     h2e   = ao2mo.kernel(m._eri, m.mo_coeff, compact=False)
     h2e   = h2e.reshape(norb, norb, norb, norb)
 
-    cisolver = fci.direct_spin0.FCI()
-    cisolver.max_cycle = 100
-    cisolver.conv_tol  = 1e-8
-    e, fcivec = cisolver.kernel(h1e, h2e, norb, mol.nelec)
-
-    print(f"ehf = {m.energy_elec()[0]: 12.6f}, efci = {e: 12.6f}")
-
     return h1e, h2e, norb, mol.nelec
 
 def get_diff_idx(diff_idx, diff_num):
@@ -103,7 +96,6 @@ def get_fci_matrix_element(config1, config2, h1e, h2e, verbose = False):
 
             for ib in occ_idx_beta:
                 h += h2e[ma, pa, ib, ib]
-                # h -= h2e[ma, ib, ib, pa]
 
             h *= (- 1.0) ** sum(config1.occ_alph[ma+1:pa])
 
@@ -117,7 +109,6 @@ def get_fci_matrix_element(config1, config2, h1e, h2e, verbose = False):
             
             for ia in occ_idx_alph:
                 h += h2e[mb, pb, ia, ia]
-                # h -= h2e[mb, ia, ia, pb]
 
             for ib in occ_idx_beta:
                 h += h2e[mb, pb, ib, ib]
@@ -126,6 +117,7 @@ def get_fci_matrix_element(config1, config2, h1e, h2e, verbose = False):
             h *= (- 1.0) ** sum(config1.occ_beta[mb+1:pb])
     
     elif diff_num == 2:
+
         if diff_idx_alph is None:
 
             mb, nb, pb, qb = get_diff_idx(diff_idx_beta, diff_num)
@@ -138,7 +130,6 @@ def get_fci_matrix_element(config1, config2, h1e, h2e, verbose = False):
             h *= (- 1.0) ** sum(occ_beta[min(nb,qb)+1:max(nb,qb)])
 
         elif diff_idx_beta is None:
-
             ma, na, pa, qa = get_diff_idx(diff_idx_alph, diff_num)
 
             h += h2e[ma, pa, na, qa]
@@ -149,7 +140,6 @@ def get_fci_matrix_element(config1, config2, h1e, h2e, verbose = False):
             h *= (- 1.0) ** sum(occ_alph[min(na, qa)+1:max(na, qa)])
 
         else:
-                
             ma, pa = get_diff_idx(diff_idx_alph, 1)
             nb, qb = get_diff_idx(diff_idx_beta, 1)
 
@@ -164,76 +154,21 @@ def get_hfci(h1e, h2e, nmo, nelecs, check = True, stdout = sys.stdout):
 
     neleca, nelecb = nelecs
     
-    na = fci.cistring.num_strings(nmo, neleca)
-    nb = fci.cistring.num_strings(nmo, nelecb)
+    na = get_nconfig(nmo, neleca)
+    nb = get_nconfig(nmo, nelecb)
 
     occs_alph = make_occs(nmo, neleca)
     occs_beta = make_occs(nmo, nelecb)
 
     hfci = numpy.zeros((na * nb, na * nb))
 
-    if check:
-        ci = numpy.eye(na * nb)
-        h  = fci_slow.absorb_h1e(h1e, h2e, nmo, nelecs, .5)
-                
-        def hop(c):
-            hc = fci_slow.contract_2e(h, c, nmo, nelecs)
-            return hc.reshape(-1)
-
-        hfci_ref = []
-
-        for ii in range(na * nb):
-            h_ci = hop(ci[ii].reshape(na, nb))
-            hfci_ref.append(h_ci)
-
-        hfci_ref = numpy.asarray(hfci_ref).reshape(na * nb, na * nb)
-
-        for ia in range(na):
-            for ib in range(nb):
-                for ja in range(na):
-                    for jb in range(nb):
-                        config1 = Config(occs_alph[ia], occs_beta[ib], nmo, (neleca, nelecb))
-                        config2 = Config(occs_alph[ja], occs_beta[jb], nmo, (neleca, nelecb))
-
-                        hfci[ia * nb + ib, ja * nb + jb] = get_fci_matrix_element(config1, config2, h1e, h2e)
-
-                        if abs(hfci[ia * nb + ib, ja * nb + jb] - hfci_ref[ia * nb + ib, ja * nb + jb]) > 1e-6:
-                            occ_idxs, vir_idxs, diff_idxs, diff_num = get_config_diff(config1, config2)
-                            print()
-                            assert diff_num == 2
-                            print("Error:", hfci[ia * nb + ib, ja * nb + jb], hfci_ref[ia * nb + ib, ja * nb + jb])
-                            print(config1.occ_alph, config1.occ_beta)
-                            print(config2.occ_alph, config2.occ_beta)
-                            
-                            print(f"{hfci[ia * nb + ib, ja * nb + jb] :12.6f}")
-                            print(f"{hfci_ref[ia * nb + ib, ja * nb + jb] :12.6f}")
-
-                            get_fci_matrix_element(config1, config2, h1e, h2e, verbose = True)
-
-        
-        efci       = scipy.linalg.eigh(hfci)[0][0]
-        efci_ref_0 = fci_slow.kernel(h1e, h2e, nmo, nelecs[0] + nelecs[1])
-        efci_ref_1 = scipy.linalg.eigh(hfci_ref)[0][0]
-
-        print(f"{efci :12.6f}", f"{efci_ref_0 :12.6f}", f"{efci_ref_1 :12.6f}")
-
-        assert abs(efci_ref_0 - efci_ref_1) < 1e-6
-        assert abs(efci_ref_0 - efci)       < 1e-6
-        assert abs(efci_ref_1 - efci)       < 1e-6
-    
-    else:
-
-        for ia in range(na):
-            for ib in range(nb):
-                for ja in range(na):
-                    for jb in range(nb):
-                        config1 = Config(occs_alph[ia], occs_beta[ib], nmo, (neleca, nelecb))
-                        config2 = Config(occs_alph[ja], occs_beta[jb], nmo, (neleca, nelecb))
-
-                        hfci[ia * nb + ib, ja * nb + jb] = get_fci_matrix_element(config1, config2, h1e, h2e)
-
-
-        
+    for ia in range(na):
+        for ib in range(nb):
+            for ja in range(na):
+                for jb in range(nb):
+                    config1 = Config(occs_alph[ia], occs_beta[ib], nmo, (neleca, nelecb))
+                    config2 = Config(occs_alph[ja], occs_beta[jb], nmo, (neleca, nelecb))
+                    hfci[ia * nb + ib, ja * nb + jb] = get_fci_matrix_element(config1, config2, h1e, h2e)
 
     return hfci
         
@@ -242,6 +177,14 @@ def kernel(h1e, h2e, nmo, nelecs):
     assert h1e.shape == (nmo, nmo)
     assert h2e.shape == (nmo, nmo, nmo, nmo)
 
-    h = get_hfci(h1e, h2e, nmo, nelecs, check = True)
+    neleca, nelecb = nelecs
+    na = get_nconfig(nmo, neleca)
+    nb = get_nconfig(nmo, nelecb)
 
-    
+    hfci = get_hfci(h1e, h2e, nmo, nelecs, check = True)
+
+    res = numpy.linalg.eigh(hfci)
+    efci = res[0][0]
+    ci   = res[1][:, 0].reshape(na, nb)
+
+    return efci, ci
