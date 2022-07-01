@@ -80,7 +80,6 @@ def test_random():
     assert e_err < 1e-8
     assert c_err < 1e-8
 
-
 if __name__ == '__main__':
     test_h6()
     test_hf()
