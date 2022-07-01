@@ -183,7 +183,7 @@ def kernel(h1e, h2e, nmo, nelecs):
 
     hfci = get_hfci(h1e, h2e, nmo, nelecs, check = True)
 
-    res = numpy.linalg.eigh(hfci)
+    res  = numpy.linalg.eigh(hfci)
     efci = res[0][0]
     ci   = res[1][:, 0].reshape(na, nb)
 
