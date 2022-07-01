@@ -27,7 +27,9 @@ problem with a maximum system size of ∼ 12 orbitals with 12 electrons.
 
 Thanks to Qiming Sun's tutorial and the guidance of Garnet Chan.
 And the invaluable advice from Drs. Zhen Luo and Yihan Shao, and
-the discussions with Rui Li and Bo Li.
+the discussions with Rui Li, Bo Li and Zhihao Cui.
 
-[]: # Language: python
-[]: # Path: simplefci.py
+## References
+[1] Szabo and Ostlund, _Modern Quantum Chemistry: Introduction to Advanced Electronic Structure Theory_, Dover Publications, New York, 1996
+
+[2] https://github.com/pyscf/pyscf
