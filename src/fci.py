@@ -130,31 +130,31 @@ def get_fci_matrix_element(config1, config2, h1e, h2e, verbose = False):
             if verbose:
                 print("diff_num = 2")
                 print(f"diff_idx_alph is None")
+                assert 1 == 2
 
             mb, nb, pb, qb = get_diff_idx(diff_idx_beta, diff_num)
 
             h += h2e[mb, pb, nb, qb]
             h -= h2e[mb, qb, nb, pb]
 
-            print(diff_idx_beta)
-            print(f"mb = {mb}, nb = {nb}, pb = {pb}, qb = {qb}")
-            print(f"h = {h}")
-            h *= (- 1.0) ** sum(config1.occ_alph[min(mb,pb)+1:max(mb,pb)])
-            h *= (- 1.0) ** sum(config1.occ_alph[min(nb,qb)+1:max(nb,qb)])
-            print(f"h = {h}")
-        
+            occ_beta = [1 if i in occ_idx_beta else 0 for i in range(nmo)]
+            h *= (- 1.0) ** sum(occ_beta[min(mb,pb)+1:max(mb,pb)])
+            h *= (- 1.0) ** sum(occ_beta[min(nb,qb)+1:max(nb,qb)])
+
         elif diff_idx_beta is None:
             if verbose:
                 print("diff_num = 2")
                 print(f"diff_idx_beta is None")
+                assert 1 == 2
 
             ma, na, pa, qa = get_diff_idx(diff_idx_alph, diff_num)
 
             h += h2e[ma, pa, na, qa]
             h -= h2e[ma, qa, na, pa]
 
-            h *= (- 1.0) ** sum(config1.occ_alph[min(ma,pa)+1:max(ma,pa)])
-            h *= (- 1.0) ** sum(config1.occ_alph[min(na,qa)+1:max(na,qa)])
+            occ_alph = [1 if i in occ_idx_alph else 0 for i in range(nmo)]
+            h *= (- 1.0) ** sum(occ_alph[min(ma, pa)+1:max(ma, pa)])
+            h *= (- 1.0) ** sum(occ_alph[min(na, qa)+1:max(na, qa)])
 
         else:
             if verbose:
