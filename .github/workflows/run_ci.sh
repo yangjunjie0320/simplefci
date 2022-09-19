@@ -11,7 +11,7 @@ fi
 
 #!/usr/bin/env bash
 export OMP_NUM_THREADS=4
-export PYTHONPATH=$(pwd):$PYTHONPATH 
+export PYTHONPATH=$(pwd)/src/:$PYTHONPATH
 ulimit -s 20000
 
 pytest

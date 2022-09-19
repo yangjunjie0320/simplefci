@@ -4,7 +4,7 @@ import scipy
 import pyscf
 
 from fci import kernel
-from fci import get_hamiltonian
+from utils import get_hamiltonian
 
 def test_h6():
     mol = pyscf.gto.Mole()
@@ -30,7 +30,7 @@ def test_h6():
     efci0, ci0 = cisolver.kernel(h1e, h2e, nmo, nelecs)
 
     e_err = abs(efci - efci0)
-    c_err = scipy.linalg.norm(ci - ci0 * numpy.einsum('ij,ij->', ci, ci0))
+    c_err = abs(1.0 - abs(numpy.einsum('ij,ij->', ci, ci0)))
     assert e_err < 1e-8
     assert c_err < 1e-8
 
@@ -51,7 +51,7 @@ def test_hf():
     efci0, ci0 = cisolver.kernel(h1e, h2e, nmo, nelecs)
 
     e_err = abs(efci - efci0)
-    c_err = scipy.linalg.norm(ci - ci0 * numpy.einsum('ij,ij->', ci, ci0))
+    c_err = abs(1.0 - abs(numpy.einsum('ij,ij->', ci, ci0)))
     assert e_err < 1e-8
     assert c_err < 1e-8
 
@@ -81,7 +81,7 @@ def test_random():
                 efci0, ci0 = cisolver.kernel(h1e, h2e, norb, nelecs)
 
                 e_err = abs(efci - efci0)
-                c_err = scipy.linalg.norm(ci - ci0 * numpy.einsum('ij,ij->', ci, ci0))
+                c_err = abs(1.0 - abs(numpy.einsum('ij,ij->', ci, ci0)))
 
                 assert e_err < 1e-6
                 assert c_err < 1e-6

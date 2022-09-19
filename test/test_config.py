@@ -1,7 +1,7 @@
 from config import get_occ_diff
 from config import make_bins
 from config import make_occs
-from config import get_occ_from_bin
+from config import _occ_from_bin
 
 def test_get_occ_diff():
 
@@ -15,7 +15,7 @@ def test_get_occ_diff():
 
     assert occ_idx  == [0, 1, 2, 3]
     assert vir_idx  == [4, 5]
-    assert diff_idx == []
+    assert diff_idx == None
 
     occ1 = [1, 1, 1, 1, 0, 0]
     occ2 = [1, 1, 1, 0, 1, 0]
@@ -47,7 +47,7 @@ def test_make_bins():
 
     for i, x in enumerate(make_bins(5, 2)):
         assert bin(x) == ref[i]
-        xx = get_occ_from_bin(x, 5)
+        xx = _occ_from_bin(x, 5)
 
     for i, x in enumerate(make_occs(5, 2)):
         print(x)

@@ -5,8 +5,23 @@ from functools import reduce
 
 import pyscf
 
-class Config(object):
-    def __init__(self, occ_alph, occ_beta, nmo, nelecs):
+class _Config(object):
+    """
+    A class to represent a determinanat configuration.
+
+    Attributes
+    ----------
+    occ_alph : str
+        a formatted string to print out what the animal says
+    occ_beta : str
+        the name of the animal
+    nmo : str
+        the sound that the animal makes
+    nelecs : int
+        the number of legs the animal has (default 4)
+    """
+
+    def __init__(self, occ_alph, occ_beta, nmo=None, nelecs=None):
         assert nmo == len(occ_alph)
         assert nmo == len(occ_beta)
 
@@ -19,6 +34,18 @@ class Config(object):
 
         self.occ_alph = occ_alph
         self.occ_beta = occ_beta
+
+def get_config(occ_alph, occ_beta, nmo=None, nelecs=None):
+    if nmo is None:
+        nmo = len(occ_alph)
+
+    if nelecs is None:
+        nelecs = (sum(occ_alph), sum(occ_beta))
+
+    return _Config(occ_alph, occ_beta, nmo, nelecs)
+
+class _ConfigDiff(object):
+    pass
 
 def get_nconfig(nmo, nelec):
     return comb(nmo, nelec, exact=True)
@@ -67,7 +94,7 @@ def make_bins(nmo, nelec):
 
     return numpy.asarray(bins, dtype=numpy.int64)
 
-def get_occ_from_bin(ci_bin, nmo):
+def _occ_from_bin(ci_bin, nmo):
     occ = []
 
     ci_string = bin(ci_bin)[2:][::-1]
@@ -83,7 +110,7 @@ def get_occ_from_bin(ci_bin, nmo):
 
 def make_occs(nmo, nelec):
     bins = make_bins(nmo, nelec)
-    return [get_occ_from_bin(b, nmo) for b in bins]
+    return [_occ_from_bin(b, nmo) for b in bins]
 
 def get_occ_diff(occ1, occ2):
     nmo = len(occ1)

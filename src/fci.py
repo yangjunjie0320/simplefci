@@ -1,35 +1,11 @@
 import sys
 import numpy
 import scipy
-from functools import reduce
 
-import pyscf
-from pyscf import fci
-from pyscf import gto
-from pyscf import scf
-from pyscf import ao2mo
-from pyscf.fci import fci_slow
-from pyscf.tools.dump_mat import dump_rec
-
-from config import get_nconfig
 from config import make_occs
-from config import Config, get_config_diff
-
-    
-def get_hamiltonian(mol: pyscf.gto.Mole):
-    '''
-    Returns the Hamiltonian in the MO basis.
-    '''
-
-    m = scf.RHF(mol)
-    m.kernel()
-
-    norb   = m.mo_coeff.shape[1]
-    h1e   = reduce(numpy.dot, (m.mo_coeff.T, m.get_hcore(), m.mo_coeff))
-    h2e   = ao2mo.kernel(m._eri, m.mo_coeff, compact=False)
-    h2e   = h2e.reshape(norb, norb, norb, norb)
-
-    return h1e, h2e, norb, mol.nelec
+from config import get_nconfig
+from config import get_config
+from config import get_config_diff
 
 def get_diff_idx(diff_idx, diff_num):
     assert diff_num in [1, 2]
@@ -166,14 +142,14 @@ def get_hfci(h1e, h2e, nmo, nelecs, check = True, stdout = sys.stdout):
         for ib in range(nb):
             for ja in range(na):
                 for jb in range(nb):
-                    config1 = Config(occs_alph[ia], occs_beta[ib], nmo, (neleca, nelecb))
-                    config2 = Config(occs_alph[ja], occs_beta[jb], nmo, (neleca, nelecb))
+                    config1 = get_config(occs_alph[ia], occs_beta[ib], nmo, (neleca, nelecb))
+                    config2 = get_config(occs_alph[ja], occs_beta[jb], nmo, (neleca, nelecb))
                     hfci[ia * nb + ib, ja * nb + jb] = get_fci_matrix_element(config1, config2, h1e, h2e)
 
     return hfci
         
 
-def kernel(h1e, h2e, nmo, nelecs):
+def kernel(h1e, h2e, nmo, nelecs, method="slater-condon"):
     assert h1e.shape == (nmo, nmo)
     assert h2e.shape == (nmo, nmo, nmo, nmo)
 
@@ -181,10 +157,17 @@ def kernel(h1e, h2e, nmo, nelecs):
     na = get_nconfig(nmo, neleca)
     nb = get_nconfig(nmo, nelecb)
 
-    hfci = get_hfci(h1e, h2e, nmo, nelecs, check = True)
+    efci = None
+    ci   = None
 
-    res  = numpy.linalg.eigh(hfci)
-    efci = res[0][0]
-    ci   = res[1][:, 0].reshape(na, nb)
+    if method == "slater-condon":
+        hfci = get_hfci(h1e, h2e, nmo, nelecs, check = True)
+
+        res  = scipy.linalg.eigh(hfci)
+        efci = res[0][0]
+        ci   = res[1][:, 0].reshape(na, nb)
+
+    else:
+        raise NotImplementedError
 
     return efci, ci
