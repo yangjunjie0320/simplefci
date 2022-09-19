@@ -25,4 +25,3 @@ def get_hamiltonian(mol: pyscf.gto.Mole):
     h2e   = h2e.reshape(norb, norb, norb, norb)
 
     return h1e, h2e, norb, mol.nelec
-    
