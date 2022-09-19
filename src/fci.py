@@ -162,7 +162,6 @@ def kernel(h1e, h2e, nmo, nelecs, method="slater-condon"):
 
     if method == "slater-condon":
         hfci = get_hfci(h1e, h2e, nmo, nelecs, check = True)
-
         res  = scipy.linalg.eigh(hfci)
         efci = res[0][0]
         ci   = res[1][:, 0].reshape(na, nb)

@@ -131,7 +131,7 @@ def get_occ_diff(occ1, occ2):
         occ2_p = occ2[p]
 
         if occ1_p == occ2_p:
-            if  occ1_p == 0:
+            if occ1_p == 0:
                 vir_idx.append(p)
 
             elif occ1_p == 1:
