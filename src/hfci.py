@@ -3,6 +3,24 @@ import numpy
 import scipy
 from scipy.special import comb
 
+# Note about naming convention:
+# - occ means occupation number, which is 0 or 1
+# - idx means index, which is 0, 1, 2, ...
+# - diff means difference, which is 0, 1, -1
+# - bin means a int64 element represents one occupations
+#   in binary format.
+# - configuration means a slater determinant, which contains
+#   alpha and beta occupations.
+# - anything works for one spin, for example `nelec_s`, `get_bins_s`
+#   (get binary numbers to represent the configurations for one spin)
+#   are marked with `..._s` suffix, or specific to alpha or beta spin,
+# - anything works for a list, for example `nelecs`, `get_configs`
+#   (get a list of configurations) 
+#   are marked with plural suffix `...s`.
+# - note that a tuple of two spin shall not be marked with any suffix,
+#   for example `nelecs` is a tuple of two ints, which represents
+#   except `nelecs` is a tuple of two ints.
+
 class _Config(object):
     '''A class to represent a determinanat configuration.
 
@@ -35,7 +53,7 @@ class _Config(object):
         self.occ_beta = occ_beta
 
 def get_configs(nmo=None, nelecs=None):
-    '''Generate configurations for alpha and beta electrons
+    '''Generate configurations for alpha and beta spins
     with given number of molecular orbitals.
 
     Parameters
@@ -50,25 +68,29 @@ def get_configs(nmo=None, nelecs=None):
     configs : list[_Config]
         a list of _Config objects
     '''
-    neleca, nelecb = nelecs
-    na = comb(nmo, neleca, exact=True)
-    nb = comb(nmo, nelecb, exact=True)
+    nelec_alph, nelec_beta = nelecs
+    na = comb(nmo, nelec_alph, exact=True)
+    nb = comb(nmo, nelec_beta, exact=True)
 
-    bins_alph = get_bins_s(nmo, neleca)
-    bins_beta = get_bins_s(nmo, nelecb)
+    bins_alph = get_bins_s(nmo, nelec_alph)
+    bins_beta = get_bins_s(nmo, nelec_beta)
+
+    assert len(bins_alph) == na
+    assert len(bins_beta) == nb
 
     configs   = []
 
-    for bin_alph, bin_beta in zip(bins_alph, bins_beta):
-        occ_alph = [1 if bin_alph & (1 << p) else 0 for p in range(nmo)]
-        occ_beta = [1 if bin_beta & (1 << p) else 0 for p in range(nmo)]
-        configs.append(_Config(occ_alph, occ_beta, nmo=nmo, nelecs=nelecs))
+    for bin_alph in bins_alph:
+        for bin_beta in bins_beta:
+            occ_alph = [1 if bin_alph & (1 << p) else 0 for p in range(nmo)]
+            occ_beta = [1 if bin_beta & (1 << p) else 0 for p in range(nmo)]
+            configs.append(_Config(occ_alph, occ_beta, nmo=nmo, nelecs=nelecs))
 
     assert len(configs) == na * nb
 
     return configs
 
-def get_bins_s(nmo, nelec):
+def get_bins_s(nmo, nelec_s):
     '''Generate binary numbers to represent the configurations
     for given spin (alpha or beta).
 
@@ -76,8 +98,8 @@ def get_bins_s(nmo, nelec):
     ----------
     nmo : int
         number of molecular orbitals
-    nelec : int
-        number of electrons
+    nelec_s : int
+        number of electrons for given spin
 
     Returns
     ----------
@@ -88,22 +110,22 @@ def get_bins_s(nmo, nelec):
         - 1 means occupied and 0 means unoccupied.
     '''
 
-    assert nelec >= 0 and nmo < 64
+    assert nelec_s >= 0 and nmo < 64
 
-    if nelec == 0:
+    if nelec_s == 0:
         return numpy.asarray([0], dtype=numpy.int64)
 
-    elif nelec > nmo:
+    elif nelec_s > nmo:
         return numpy.asarray([], dtype=numpy.int64)
         
-    def _get_bins_s(nmo, nelec):
+    def _get_bins_s(nmo, nelec_s):
         '''A recursive function to generate binary numbers
         to represent the configurations.
         '''
-        if nelec == 1:
+        if nelec_s == 1:
             res = [(1 << i) for i in range(nmo)]
 
-        elif nelec >= nmo:
+        elif nelec_s >= nmo:
             n = 0
             for i in range(nmo):
                 n = n | (1 << i)
@@ -111,20 +133,54 @@ def get_bins_s(nmo, nelec):
             
         else:
             thisorb = 1 << (nmo - 1)
-            res = _get_bins_s(nmo - 1, nelec)
+            res = _get_bins_s(nmo - 1, nelec_s)
 
-            for n in _get_bins_s(nmo - 1, nelec - 1):
+            for n in _get_bins_s(nmo - 1, nelec_s - 1):
                 res.append(n | thisorb)
 
         return res
 
-    bins = _get_bins_s(nmo, nelec)
+    bins = _get_bins_s(nmo, nelec_s)
     return numpy.asarray(bins, dtype=numpy.int64)
 
-class _OccDiff(object):
-    pass
+class _ConfigDiff(object):
+    '''A class to represent the difference between
+    two configurations (for both spin).
 
-def get_occ_diff(occ1, occ2):
+    Attributes
+    ----------
+    occ_idx : tuple(list[int], list[int])
+        a list of common occupied orbital indices
+    vir_idx : tuple(list[int], list[int])
+        a list of common virtual orbital indices
+    diff_idx : tuple(list[int], list[int])
+        a tuple of two lists of orbital indices
+        corresponding to the difference between
+        two determinants
+    '''
+
+    def __init__(self, occ_idx, vir_idx, diff_idx):
+        occ_idx_alph, occ_idx_beta = occ_idx
+        vir_idx_alph, vir_idx_beta = vir_idx
+        diff_idx_alph, diff_idx_beta = diff_idx
+
+        self.occ_idx_alph = occ_idx_alph
+        self.occ_idx_beta = occ_idx_beta
+        self.vir_idx_alph = vir_idx_alph
+        self.vir_idx_beta = vir_idx_beta
+        self.diff_idx_alph = diff_idx_alph
+        self.diff_idx_beta = diff_idx_beta
+        
+        diff_num = len(diff_idx[0])
+        assert diff_num == len(diff_idx[0])
+        assert diff_num == len(diff_idx[1])
+        self.diff_num = diff_num
+
+def get_occ_diff_s(occ1_s, occ2_s):
+    '''Get the difference between two occupation lists
+    for one spin.
+
+    '''
     nmo = len(occ1)
 
     assert len(occ1) == nmo
@@ -178,44 +234,34 @@ def get_occ_diff(occ1, occ2):
 
     return occ_idx, vir_idx, diff_idx
 
-class _ConfigDiff(object):
-    '''A class to represent the difference between two determinants.
-
-    Attributes
-    ----------
-    occ_idx : list[int]
-        a list of common occupied orbital indices
-    vir_idx : list[int]
-        a list of common virtual orbital indices
-    diff_idx : tuple[list[int], list[int]]
-        a tuple of two lists of orbital indices
-        corresponding to the difference between
-        two determinants
-    '''
-
-    def __init__(self, occ_idx, vir_idx, diff_idx):
-        self.occ_idx  = occ_idx
-        self.vir_idx  = vir_idx
-        self.diff_idx = diff_idx
-
 def get_config_diff(config1, config2):
     occ1_alph = config1.occ_alph
     occ1_beta = config1.occ_beta
     occ2_alph = config2.occ_alph
     occ2_beta = config2.occ_beta
 
-    occ_idx_alph, vir_idx_alph, diff_idx_alph = get_occ_diff(occ1_alph, occ2_alph)
-    occ_idx_beta, vir_idx_beta, diff_idx_beta = get_occ_diff(occ1_beta, occ2_beta)
+    occ_idx   = []
+    vir_idx   = []
+    diff_idx  = []
 
-    occ_idxs  = (occ_idx_alph, occ_idx_beta)
-    vir_idxs  = (vir_idx_alph, vir_idx_beta)
-    diff_idxs = (diff_idx_alph, diff_idx_beta)
+    for occ1_s, occ2_s in zip([occ1_alph, occ1_beta], [occ2_alph, occ2_beta]):
+        occ_idx_s, vir_idx_s, diff_idx_s = get_occ_diff_s(occ1_s, occ2_s)
+
+        occ_idx.append(occ_idx_s)
+        vir_idx.append(vir_idx_s)
+        diff_idx.append(diff_idx_s)
 
     diff_num  = 0
+
+    for diff_idx_s in diff_idxs:
     if diff_idx_alph is not None:
         diff_num += len(diff_idx_alph[0])
     if diff_idx_beta is not None:
         diff_num += len(diff_idx_beta[0])
+
+    config_diff = _ConfigDiff(occ_idxs, vir_idxs, diff_idxs, diff_num)
+
+
 
     return occ_idxs, vir_idxs, diff_idxs, diff_num
 
