@@ -150,10 +150,17 @@ class _ConfigDiff(object):
     Attributes
     ----------
     occ_idx : tuple(list[int], list[int])
-        a list of common occupied orbital indices
+        a tuple of two lists of common occupied orbital 
+        indices for each spin
     vir_idx : tuple(list[int], list[int])
-        a list of common virtual orbital indices
+        a tuple of two lists of common virtual orbital 
+        indices for each spin
     diff_idx : tuple(list[int], list[int])
+        ...
+
+        a tuple of two lists of common virtual orbital 
+        indices for each spin
+
         a tuple of two lists of orbital indices
         corresponding to the difference between
         two determinants
@@ -176,52 +183,74 @@ class _ConfigDiff(object):
         assert diff_num == len(diff_idx[1])
         self.diff_num = diff_num
 
+    def get_diff_idx(self):
+        diff_num = self.diff_num
+        diff_idx = self.diff_idx
+
+        assert diff_num in [1, 2]
+
+        if diff_num == 1:
+            m = min(diff_idx[0][0], diff_idx[1][0])
+            p = max(diff_idx[0][0], diff_idx[1][0])
+            return m, p
+
+        elif diff_num == 2:
+            m, n = min(diff_idx[0]), max(diff_idx[0])   
+            p, q = min(diff_idx[1]), max(diff_idx[1])
+
+            return m, n, p, q
+
+        else:
+            return None
+
 def get_occ_diff_s(occ1_s, occ2_s):
     '''Get the difference between two occupation lists
     for one spin.
 
     '''
-    nmo = len(occ1)
+    nmo = len(occ1_s)
 
-    assert len(occ1) == nmo
-    assert len(occ2) == nmo
-    assert sum(occ1) == sum(occ2)
+    assert len(occ1_s) == nmo
+    assert len(occ2_s) == nmo
+    assert sum(occ1_s) == sum(occ2_s)
 
-    occ_idx    = []
-    vir_idx    = []
-    diff_idx_1 = []
-    diff_idx_2 = []
+    comm_occ_idx_s = []
+    comm_vir_idx_s = []
 
-    diff     = []
+    diff_s = []
 
     for p in range(nmo):
-        occ1_p = occ1[p]
-        occ2_p = occ2[p]
+        occ1_p_s = occ1_s[p]
+        occ2_p_s = occ2_s[p]
 
-        if occ1_p == occ2_p:
-            if occ1_p == 0:
-                vir_idx.append(p)
+        if occ1_p_s == occ2_p_s:
+            if occ1_p_s == 0:
+                comm_vir_idx_s.append(p)
 
-            elif occ1_p == 1:
-                occ_idx.append(p)
+            elif occ1_p_s == 1:
+                comm_vir_idx_s.append(p)
 
             else:
                 raise RuntimeError("Invalid Occupation Number")
         else:
-            assert occ1_p in [0, 1]
-            assert occ2_p in [0, 1]
+            assert occ1_p_s in [0, 1]
+            assert occ2_p_s in [0, 1]
 
-        diff.append(occ1_p - occ2_p)
+        diff_s.append(occ1_p_s - occ2_p_s)
+
+    diff_idx_1 = []
+    diff_idx_2 = []
 
     for p in range(nmo):
-        diff_p = diff[p]
+        diff_p_s = diff_s[p]
 
-        if diff_p == 1:
+        if diff_p_s == 1:
             diff_idx_1.append(p)
-        elif diff_p == -1:
+        elif diff_p_s == -1:
             diff_idx_2.append(p)
         else:
-            assert diff_p == 0
+            assert p in comm_occ_idx_s or p in comm_vir_idx_s
+            assert diff_p_s == 0
 
     assert len(diff_idx_1) == len(diff_idx_2)
 
@@ -259,25 +288,11 @@ def get_config_diff(config1, config2):
     if diff_idx_beta is not None:
         diff_num += len(diff_idx_beta[0])
 
-    config_diff = _ConfigDiff(occ_idxs, vir_idxs, diff_idxs, diff_num)
+    config_diff = _ConfigDiff(occ_idx, vir_idx, diff_idx, diff_num)
 
 
 
-    return occ_idxs, vir_idxs, diff_idxs, diff_num
-
-def get_diff_idx(diff_idx, diff_num):
-    assert diff_num in [1, 2]
-
-    if diff_num == 1:
-        m = min(diff_idx[0][0], diff_idx[1][0])
-        p = max(diff_idx[0][0], diff_idx[1][0])
-        return m, p
-
-    elif diff_num == 2:
-        m, n = min(diff_idx[0]), max(diff_idx[0])   
-        p, q = min(diff_idx[1]), max(diff_idx[1])
-
-        return m, n, p, q
+    return config_diff
 
 def get_fci_matrix_element(config1, config2, h1e, h2e, verbose = False):
     '''

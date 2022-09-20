@@ -1,7 +1,7 @@
-from config import get_occ_diff
-from config import make_bins
-from config import make_occs
-from config import _occ_from_bin
+from hfci import get_occ_diff
+from hfci import make_bins
+from hfci import make_occs
+from hfci import _occ_from_bin
 
 def test_get_occ_diff():
 
