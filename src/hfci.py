@@ -1,7 +1,8 @@
 import numpy
-import scipy
 
+import scipy
 from scipy.special import comb
+
 class _Config(object):
     '''A class to represent a determinanat configuration.
 
@@ -176,6 +177,26 @@ def get_occ_diff(occ1, occ2):
         diff_idx = (diff_idx_1, diff_idx_2)
 
     return occ_idx, vir_idx, diff_idx
+
+class _ConfigDiff(object):
+    '''A class to represent the difference between two determinants.
+
+    Attributes
+    ----------
+    occ_idx : list[int]
+        a list of common occupied orbital indices
+    vir_idx : list[int]
+        a list of common virtual orbital indices
+    diff_idx : tuple[list[int], list[int]]
+        a tuple of two lists of orbital indices
+        corresponding to the difference between
+        two determinants
+    '''
+
+    def __init__(self, occ_idx, vir_idx, diff_idx):
+        self.occ_idx  = occ_idx
+        self.vir_idx  = vir_idx
+        self.diff_idx = diff_idx
 
 def get_config_diff(config1, config2):
     occ1_alph = config1.occ_alph
