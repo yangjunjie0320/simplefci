@@ -2,6 +2,7 @@ import numpy
 import scipy
 
 import pyscf
+from pyscf import fci
 
 from fci import kernel
 from utils import get_hamiltonian
@@ -22,7 +23,7 @@ def test_h6():
     mol.build()
 
     h1e, h2e, nmo, nelecs = get_hamiltonian(mol)
-    efci, ci = kernel(h1e, h2e, nmo, nelecs)
+    efci, ci = kernel(h1e, h2e, nmo, nelecs, method="slater-condon")
 
     cisolver = pyscf.fci.direct_spin1.FCI()
     cisolver.max_cycle = 100
@@ -31,6 +32,7 @@ def test_h6():
 
     e_err = abs(efci - efci0)
     c_err = abs(1.0 - abs(numpy.einsum('ij,ij->', ci, ci0)))
+    print(e_err, c_err)
     assert e_err < 1e-8
     assert c_err < 1e-8
 
@@ -43,7 +45,7 @@ def test_hf():
     )
 
     h1e, h2e, nmo, nelecs = get_hamiltonian(mol)
-    efci, ci = kernel(h1e, h2e, nmo, nelecs)
+    efci, ci = kernel(h1e, h2e, nmo, nelecs, method="slater-condon")
 
     cisolver = pyscf.fci.direct_spin1.FCI()
     cisolver.max_cycle = 100
@@ -72,7 +74,7 @@ def test_random():
                 h2e = h2e + h2e.transpose(0, 1, 3, 2)
                 h2e = h2e + h2e.transpose(2, 3, 0, 1)
 
-                efci, ci = kernel(h1e, h2e, norb, nelecs)
+                efci, ci = kernel(h1e, h2e, norb, nelecs, method="slater-condon")
 
                 cisolver = pyscf.fci.direct_spin1.FCI()
                 cisolver.verbose = 5

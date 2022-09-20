@@ -2,14 +2,11 @@ from functools import reduce
 
 import numpy
 import scipy
+from scipy import special
 
 import pyscf
-from pyscf import fci
-from pyscf import gto
 from pyscf import scf
 from pyscf import ao2mo
-from pyscf.fci import fci_slow
-from pyscf.tools.dump_mat import dump_rec
 
 def get_hamiltonian(mol: pyscf.gto.Mole):
     '''
@@ -25,3 +22,6 @@ def get_hamiltonian(mol: pyscf.gto.Mole):
     h2e   = h2e.reshape(norb, norb, norb, norb)
 
     return h1e, h2e, norb, mol.nelec
+
+def comb(nmo, nelec_s):
+    return int(special.comb(nmo, nelec_s, exact=True))

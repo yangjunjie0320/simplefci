@@ -1,7 +1,7 @@
 import numpy
-
 import scipy
-from scipy.special import comb
+
+from utils import comb
 
 # Note about naming convention:
 # - occ means occupation number, which is 0 or 1
@@ -69,8 +69,8 @@ def get_configs(nmo=None, nelecs=None):
         a list of _Config objects
     '''
     nelec_alph, nelec_beta = nelecs
-    na = comb(nmo, nelec_alph, exact=True)
-    nb = comb(nmo, nelec_beta, exact=True)
+    na = comb(nmo, nelec_alph)
+    nb = comb(nmo, nelec_beta)
 
     bins_alph = get_bins_s(nmo, nelec_alph)
     bins_beta = get_bins_s(nmo, nelec_beta)
@@ -166,42 +166,36 @@ class _ConfigDiff(object):
         two determinants
     '''
 
-    def __init__(self, occ_idx, vir_idx, diff_idx):
-        occ_idx_alph, occ_idx_beta = occ_idx
-        vir_idx_alph, vir_idx_beta = vir_idx
-        diff_idx_alph, diff_idx_beta = diff_idx
+    def __init__(self, comm_occ_idx, comm_vir_idx, diff_idx_1, diff_idx_2):
+        comm_occ_idx_alph, comm_occ_idx_beta = comm_occ_idx
+        comm_vir_idx_alph, comm_vir_idx_beta = comm_vir_idx
+        diff_idx_1_alph, diff_idx_1_beta = diff_idx_1
+        diff_idx_2_alph, diff_idx_2_beta = diff_idx_2
 
-        self.occ_idx_alph = occ_idx_alph
-        self.occ_idx_beta = occ_idx_beta
-        self.vir_idx_alph = vir_idx_alph
-        self.vir_idx_beta = vir_idx_beta
-        self.diff_idx_alph = diff_idx_alph
-        self.diff_idx_beta = diff_idx_beta
+        self.comm_occ_idx_alph = comm_occ_idx_alph
+        self.comm_occ_idx_beta = comm_occ_idx_beta
+        self.comm_vir_idx_alph = comm_vir_idx_alph
+        self.comm_vir_idx_beta = comm_vir_idx_beta
+        self.diff_idx_1_alph   = diff_idx_1_alph
+        self.diff_idx_1_beta   = diff_idx_1_beta
+        self.diff_idx_2_alph   = diff_idx_2_alph
+        self.diff_idx_2_beta   = diff_idx_2_beta
         
-        diff_num = len(diff_idx[0])
-        assert diff_num == len(diff_idx[0])
-        assert diff_num == len(diff_idx[1])
-        self.diff_num = diff_num
+        diff_num = 0
 
-    def get_diff_idx(self):
-        diff_num = self.diff_num
-        diff_idx = self.diff_idx
-
-        assert diff_num in [1, 2]
-
-        if diff_num == 1:
-            m = min(diff_idx[0][0], diff_idx[1][0])
-            p = max(diff_idx[0][0], diff_idx[1][0])
-            return m, p
-
-        elif diff_num == 2:
-            m, n = min(diff_idx[0]), max(diff_idx[0])   
-            p, q = min(diff_idx[1]), max(diff_idx[1])
-
-            return m, n, p, q
-
+        if diff_idx_1_alph is not None:
+            diff_num += len(diff_idx_1_alph)
+            assert len(diff_idx_1_alph) == len(diff_idx_2_alph)
         else:
-            return None
+            assert diff_idx_2_alph is None
+
+        if diff_idx_1_beta is not None:
+            diff_num += len(diff_idx_1_beta)
+            assert len(diff_idx_1_beta) == len(diff_idx_2_beta)
+        else:
+            assert diff_idx_2_beta is None
+
+        self.diff_num = diff_num
 
 def get_occ_diff_s(occ1_s, occ2_s):
     '''Get the difference between two occupation lists
@@ -228,7 +222,7 @@ def get_occ_diff_s(occ1_s, occ2_s):
                 comm_vir_idx_s.append(p)
 
             elif occ1_p_s == 1:
-                comm_vir_idx_s.append(p)
+                comm_occ_idx_s.append(p)
 
             else:
                 raise RuntimeError("Invalid Occupation Number")
@@ -238,30 +232,28 @@ def get_occ_diff_s(occ1_s, occ2_s):
 
         diff_s.append(occ1_p_s - occ2_p_s)
 
-    diff_idx_1 = []
-    diff_idx_2 = []
+    diff_idx_1_s = []
+    diff_idx_2_s = []
 
     for p in range(nmo):
         diff_p_s = diff_s[p]
 
         if diff_p_s == 1:
-            diff_idx_1.append(p)
+            diff_idx_1_s.append(p)
+
         elif diff_p_s == -1:
-            diff_idx_2.append(p)
+            diff_idx_2_s.append(p)
+
         else:
             assert p in comm_occ_idx_s or p in comm_vir_idx_s
             assert diff_p_s == 0
 
-    assert len(diff_idx_1) == len(diff_idx_2)
+    assert len(diff_idx_1_s) == len(diff_idx_2_s)
 
-    diff_idx = None
-
-    if len(diff_idx_1) == 0:
-        diff_idx = None
+    if len(diff_idx_1_s) == 0:
+        return comm_occ_idx_s, comm_vir_idx_s, None, None
     else:
-        diff_idx = (diff_idx_1, diff_idx_2)
-
-    return occ_idx, vir_idx, diff_idx
+        return comm_occ_idx_s, comm_vir_idx_s, diff_idx_1_s, diff_idx_2_s
 
 def get_config_diff(config1, config2):
     occ1_alph = config1.occ_alph
@@ -271,30 +263,42 @@ def get_config_diff(config1, config2):
 
     occ_idx   = []
     vir_idx   = []
-    diff_idx  = []
+    diff_idx_1  = []
+    diff_idx_2  = []
 
     for occ1_s, occ2_s in zip([occ1_alph, occ1_beta], [occ2_alph, occ2_beta]):
-        occ_idx_s, vir_idx_s, diff_idx_s = get_occ_diff_s(occ1_s, occ2_s)
+        occ_idx_s, vir_idx_s, diff_idx_1_s, diff_idx_2_s = get_occ_diff_s(occ1_s, occ2_s)
 
         occ_idx.append(occ_idx_s)
         vir_idx.append(vir_idx_s)
-        diff_idx.append(diff_idx_s)
 
-    diff_num  = 0
+        diff_idx_1.append(diff_idx_1_s)
+        diff_idx_2.append(diff_idx_2_s)
 
-    for diff_idx_s in diff_idxs:
-    if diff_idx_alph is not None:
-        diff_num += len(diff_idx_alph[0])
-    if diff_idx_beta is not None:
-        diff_num += len(diff_idx_beta[0])
-
-    config_diff = _ConfigDiff(occ_idx, vir_idx, diff_idx, diff_num)
-
-
+    config_diff = _ConfigDiff(occ_idx, vir_idx, diff_idx_1, diff_idx_2)
 
     return config_diff
 
-def get_fci_matrix_element(config1, config2, h1e, h2e, verbose = False):
+def _diff_idx(diff_num, diff_idx_1_s, diff_idx_2_s):
+
+    assert diff_num in [1, 2]
+
+    if diff_num == 1:
+        assert diff_idx_1_s[0] != diff_idx_2_s[0]
+        m = min(diff_idx_1_s[0], diff_idx_2_s[0])
+        p = max(diff_idx_1_s[0], diff_idx_2_s[0])
+        return m, p
+
+    elif diff_num == 2:
+        m, n = min(diff_idx_1_s), max(diff_idx_2_s)   
+        p, q = min(diff_idx_1_s), max(diff_idx_2_s)
+
+        return m, n, p, q
+
+    else:
+        return None
+
+def get_hfci_matrix_element(config1, config2, h1e, h2e, verbose = False):
     '''
     Returns the matrix element of the FCI Hamiltonian.
     '''
@@ -303,63 +307,75 @@ def get_fci_matrix_element(config1, config2, h1e, h2e, verbose = False):
     assert h1e.shape == (nmo, nmo)
     assert h2e.shape == (nmo, nmo, nmo, nmo)
 
-    occ_idxs, vir_idxs, diff_idxs, diff_num = get_config_diff(config1, config2)
-    diff_idx_alph, diff_idx_beta = diff_idxs
-    occ_idx_alph, occ_idx_beta   = occ_idxs
+    config_diff = get_config_diff(config1, config2)
+    diff_num    = config_diff.diff_num
+
+    comm_occ_idx_alph = config_diff.comm_occ_idx_alph
+    comm_occ_idx_beta = config_diff.comm_occ_idx_beta
+    comm_vir_idx_alph = config_diff.comm_vir_idx_alph
+    comm_vir_idx_beta = config_diff.comm_vir_idx_beta
+    diff_idx_1_alph   = config_diff.diff_idx_1_alph
+    diff_idx_1_beta   = config_diff.diff_idx_1_beta
+    diff_idx_2_alph   = config_diff.diff_idx_2_alph
+    diff_idx_2_beta   = config_diff.diff_idx_2_beta
 
     h = 0.0
 
     if diff_num == 0:
-        for ia in occ_idx_alph:
+        for ia in comm_occ_idx_alph:
             h += h1e[ia, ia]
 
-            for ja in occ_idx_alph:
+            for ja in comm_occ_idx_alph:
                 h += 0.5 * h2e[ia, ia, ja, ja]
                 h -= 0.5 * h2e[ia, ja, ja, ia]
 
-            for jb in occ_idx_beta:
+            for jb in comm_occ_idx_beta:
                 h += 0.5 * h2e[ia, ia, jb, jb]
         
-        for ib in occ_idx_beta:
+        for ib in comm_occ_idx_beta:
             h += h1e[ib, ib]
 
-            for ja in occ_idx_alph:
+            for ja in comm_occ_idx_alph:
                 h += 0.5 * h2e[ib, ib, ja, ja]
 
-            for jb in occ_idx_beta:
+            for jb in comm_occ_idx_beta:
                 h += 0.5 * h2e[ib, ib, jb, jb]
                 h -= 0.5 * h2e[ib, jb, jb, ib]
 
     elif diff_num == 1:
-        if diff_idx_alph is not None:            
-            assert diff_idx_beta is None
-            assert diff_idx_alph[0][0] != diff_idx_alph[1][0]
+        if diff_idx_1_alph is not None:
+            assert diff_idx_2_alph is not None
 
-            ma, pa = get_diff_idx(diff_idx_alph, diff_num)
+            assert diff_idx_1_beta is None
+            assert diff_idx_2_beta is None
+
+            ma, pa = _diff_idx(diff_num, diff_idx_1_alph, diff_idx_2_alph)
 
             h += h1e[ma, pa]
 
-            for ia in occ_idx_alph:
+            for ia in comm_occ_idx_alph:
                 h += h2e[ma, pa, ia, ia]
                 h -= h2e[ma, ia, ia, pa]
 
-            for ib in occ_idx_beta:
+            for ib in comm_occ_idx_beta:
                 h += h2e[ma, pa, ib, ib]
 
             h *= (- 1.0) ** sum(config1.occ_alph[ma+1:pa])
 
-        elif diff_idx_beta is not None:
-            assert diff_idx_alph is None
-            assert diff_idx_beta[0][0] != diff_idx_beta[1][0]
+        elif diff_idx_1_beta is not None:
+            assert diff_idx_2_beta is not None
 
-            mb, pb = get_diff_idx(diff_idx_beta, diff_num)
+            assert diff_idx_1_alph is None
+            assert diff_idx_2_alph is None
+
+            mb, pb = _diff_idx(diff_num, diff_idx_1_beta, diff_idx_2_beta)
 
             h += h1e[mb, pb]
             
-            for ia in occ_idx_alph:
+            for ia in comm_occ_idx_beta:
                 h += h2e[mb, pb, ia, ia]
 
-            for ib in occ_idx_beta:
+            for ib in comm_occ_idx_beta:
                 h += h2e[mb, pb, ib, ib]
                 h -= h2e[mb, ib, ib, pb]
             
@@ -367,30 +383,29 @@ def get_fci_matrix_element(config1, config2, h1e, h2e, verbose = False):
     
     elif diff_num == 2:
 
-        if diff_idx_alph is None:
-
-            mb, nb, pb, qb = get_diff_idx(diff_idx_beta, diff_num)
+        if diff_idx_1_alph is None:
+            mb, nb, pb, qb = _diff_idx(2, diff_idx_1_beta, diff_idx_2_beta)
+            comm_occ_beta = [1 if i in comm_occ_idx_beta else 0 for i in range(nmo)]
 
             h += h2e[mb, pb, nb, qb]
             h -= h2e[mb, qb, nb, pb]
+            
+            h *= (- 1.0) ** sum(comm_occ_beta[min(mb,pb)+1:max(mb,pb)])
+            h *= (- 1.0) ** sum(comm_occ_beta[min(nb,qb)+1:max(nb,qb)])
 
-            occ_beta = [1 if i in occ_idx_beta else 0 for i in range(nmo)]
-            h *= (- 1.0) ** sum(occ_beta[min(mb,pb)+1:max(mb,pb)])
-            h *= (- 1.0) ** sum(occ_beta[min(nb,qb)+1:max(nb,qb)])
-
-        elif diff_idx_beta is None:
-            ma, na, pa, qa = get_diff_idx(diff_idx_alph, diff_num)
+        elif diff_idx_1_beta is None:
+            ma, na, pa, qa = _diff_idx(2, diff_idx_1_alph, diff_idx_2_alph)
+            comm_occ_alph = [1 if i in comm_occ_idx_alph else 0 for i in range(nmo)]
 
             h += h2e[ma, pa, na, qa]
             h -= h2e[ma, qa, na, pa]
 
-            occ_alph = [1 if i in occ_idx_alph else 0 for i in range(nmo)]
-            h *= (- 1.0) ** sum(occ_alph[min(ma, pa)+1:max(ma, pa)])
-            h *= (- 1.0) ** sum(occ_alph[min(na, qa)+1:max(na, qa)])
+            h *= (- 1.0) ** sum(comm_occ_alph[min(ma, pa)+1:max(ma, pa)])
+            h *= (- 1.0) ** sum(comm_occ_alph[min(na, qa)+1:max(na, qa)])
 
         else:
-            ma, pa = get_diff_idx(diff_idx_alph, 1)
-            nb, qb = get_diff_idx(diff_idx_beta, 1)
+            ma, pa = _diff_idx(1, diff_idx_1_alph, diff_idx_2_alph)
+            nb, qb = _diff_idx(1, diff_idx_1_beta, diff_idx_2_beta)
 
             h += h2e[ma, pa, nb, qb]
 
@@ -403,22 +418,17 @@ def get_hfci(h1e, h2e, nmo, nelecs):
 
     neleca, nelecb = nelecs
     
-    na = get_num_configs(nmo, neleca)
-    nb = get_num_configs(nmo, nelecb)
+    na = comb(nmo, neleca)
+    nb = comb(nmo, nelecb)
 
-    bin_alph = make_occs(nmo, neleca)
-    bin_beta = make_occs(nmo, nelecb)
+    configs = get_configs(nmo, nelecs)
 
     hfci = numpy.zeros((na * nb, na * nb))
 
-    for ia in range(na):
-        for ib in range(nb):
-            for ja in range(na):
-                for jb in range(nb):
-                    bins_iaib = (bin_alph[ia], bin_beta[ib])
-                    bins_jajb = (bin_alph[ja], bin_beta[jb])
-                    config1 = get_config(bins_iaib, nmo, (neleca, nelecb))
-                    config2 = get_config(bins_jajb, nmo, (neleca, nelecb))
-                    hfci[ia * nb + ib, ja * nb + jb] = get_fci_matrix_element(config1, config2, h1e, h2e)
+    for i, config1 in enumerate(configs):
+        for j, config2 in enumerate(configs):
+            hfci[i, j] = get_hfci_matrix_element(config1, config2, h1e, h2e)
+
+    print(hfci)
 
     return hfci
