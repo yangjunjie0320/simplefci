@@ -149,21 +149,14 @@ class _ConfigDiff(object):
 
     Attributes
     ----------
-    occ_idx : tuple(list[int], list[int])
+    comm_occ_idx : tuple(list[int], list[int])
         a tuple of two lists of common occupied orbital 
         indices for each spin
-    vir_idx : tuple(list[int], list[int])
+    comm_vir_idx : tuple(list[int], list[int])
         a tuple of two lists of common virtual orbital 
         indices for each spin
-    diff_idx : tuple(list[int], list[int])
-        ...
-
-        a tuple of two lists of common virtual orbital 
-        indices for each spin
-
-        a tuple of two lists of orbital indices
-        corresponding to the difference between
-        two determinants
+    diff_idx_1 : tuple(list[int], list[int])
+    diff_idx_2 : tuple(list[int], list[int])
     '''
 
     def __init__(self, comm_occ_idx, comm_vir_idx, diff_idx_1, diff_idx_2):
@@ -197,7 +190,7 @@ class _ConfigDiff(object):
 
         self.diff_num = diff_num
 
-def get_occ_diff_s(occ1_s, occ2_s):
+def _occ_diff_s(occ1_s, occ2_s):
     '''Get the difference between two occupation lists
     for one spin.
 
@@ -267,7 +260,7 @@ def get_config_diff(config1, config2):
     diff_idx_2  = []
 
     for occ1_s, occ2_s in zip([occ1_alph, occ1_beta], [occ2_alph, occ2_beta]):
-        occ_idx_s, vir_idx_s, diff_idx_1_s, diff_idx_2_s = get_occ_diff_s(occ1_s, occ2_s)
+        occ_idx_s, vir_idx_s, diff_idx_1_s, diff_idx_2_s = _occ_diff_s(occ1_s, occ2_s)
 
         occ_idx.append(occ_idx_s)
         vir_idx.append(vir_idx_s)
@@ -290,8 +283,8 @@ def _diff_idx(diff_num, diff_idx_1_s, diff_idx_2_s):
         return m, p
 
     elif diff_num == 2:
-        m, n = min(diff_idx_1_s), max(diff_idx_2_s)   
-        p, q = min(diff_idx_1_s), max(diff_idx_2_s)
+        m, n = min(diff_idx_1_s), max(diff_idx_1_s)   
+        p, q = min(diff_idx_2_s), max(diff_idx_2_s)
 
         return m, n, p, q
 
@@ -372,7 +365,7 @@ def get_hfci_matrix_element(config1, config2, h1e, h2e, verbose = False):
 
             h += h1e[mb, pb]
             
-            for ia in comm_occ_idx_beta:
+            for ia in comm_occ_idx_alph:
                 h += h2e[mb, pb, ia, ia]
 
             for ib in comm_occ_idx_beta:
@@ -380,6 +373,9 @@ def get_hfci_matrix_element(config1, config2, h1e, h2e, verbose = False):
                 h -= h2e[mb, ib, ib, pb]
             
             h *= (- 1.0) ** sum(config1.occ_beta[mb+1:pb])
+
+        else:
+            raise RuntimeError
     
     elif diff_num == 2:
 
@@ -422,13 +418,10 @@ def get_hfci(h1e, h2e, nmo, nelecs):
     nb = comb(nmo, nelecb)
 
     configs = get_configs(nmo, nelecs)
-
     hfci = numpy.zeros((na * nb, na * nb))
 
     for i, config1 in enumerate(configs):
         for j, config2 in enumerate(configs):
             hfci[i, j] = get_hfci_matrix_element(config1, config2, h1e, h2e)
-
-    print(hfci)
 
     return hfci

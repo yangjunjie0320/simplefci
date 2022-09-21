@@ -16,7 +16,7 @@ def get_hamiltonian(mol: pyscf.gto.Mole):
     m = scf.RHF(mol)
     m.kernel()
 
-    norb   = m.mo_coeff.shape[1]
+    norb  = m.mo_coeff.shape[1]
     h1e   = reduce(numpy.dot, (m.mo_coeff.T, m.get_hcore(), m.mo_coeff))
     h2e   = ao2mo.kernel(m._eri, m.mo_coeff, compact=False)
     h2e   = h2e.reshape(norb, norb, norb, norb)

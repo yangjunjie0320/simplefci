@@ -32,7 +32,6 @@ def test_h6():
 
     e_err = abs(efci - efci0)
     c_err = abs(1.0 - abs(numpy.einsum('ij,ij->', ci, ci0)))
-    print(e_err, c_err)
     assert e_err < 1e-8
     assert c_err < 1e-8
 
@@ -92,3 +91,4 @@ if __name__ == '__main__':
     test_h6()
     test_hf()
     test_random()
+    
