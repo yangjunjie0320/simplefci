@@ -305,8 +305,6 @@ def get_hfci_matrix_element(config1, config2, h1e, h2e, verbose = False):
 
     comm_occ_idx_alph = config_diff.comm_occ_idx_alph
     comm_occ_idx_beta = config_diff.comm_occ_idx_beta
-    comm_vir_idx_alph = config_diff.comm_vir_idx_alph
-    comm_vir_idx_beta = config_diff.comm_vir_idx_beta
     diff_idx_1_alph   = config_diff.diff_idx_1_alph
     diff_idx_1_beta   = config_diff.diff_idx_1_beta
     diff_idx_2_alph   = config_diff.diff_idx_2_alph

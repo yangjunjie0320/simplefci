@@ -25,3 +25,4 @@ def get_hamiltonian(mol: pyscf.gto.Mole):
 
 def comb(nmo, nelec_s):
     return int(special.comb(nmo, nelec_s, exact=True))
+    
