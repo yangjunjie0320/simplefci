@@ -7,6 +7,8 @@ from pyscf import fci
 from fci import kernel
 from utils import get_hamiltonian
 
+TOL = 1e-6
+
 def test_h6():
     mol = pyscf.gto.Mole()
     mol.verbose = 0
@@ -23,17 +25,18 @@ def test_h6():
     mol.build()
 
     h1e, h2e, nmo, nelecs = get_hamiltonian(mol)
-    efci, ci = kernel(h1e, h2e, nmo, nelecs, method="slater-condon")
+    efci, ci = kernel(h1e, h2e, nmo, nelecs, nroots=1, tol=TOL, method="slater-condon")
 
     cisolver = pyscf.fci.direct_spin1.FCI()
     cisolver.max_cycle = 100
-    cisolver.conv_tol  = 1e-8
+    cisolver.conv_tol  = TOL
+    cisolver.nroots    = 1
     efci0, ci0 = cisolver.kernel(h1e, h2e, nmo, nelecs)
 
     e_err = abs(efci - efci0)
     c_err = abs(1.0 - abs(numpy.einsum('ij,ij->', ci, ci0)))
-    assert e_err < 1e-8
-    assert c_err < 1e-8
+    assert e_err < TOL
+    assert c_err < TOL
 
 def test_hf():
     mol = pyscf.M(
@@ -44,17 +47,18 @@ def test_hf():
     )
 
     h1e, h2e, nmo, nelecs = get_hamiltonian(mol)
-    efci, ci = kernel(h1e, h2e, nmo, nelecs, method="slater-condon")
+    efci, ci = kernel(h1e, h2e, nmo, nelecs, nroots=1, tol=TOL, method="slater-condon")
 
     cisolver = pyscf.fci.direct_spin1.FCI()
     cisolver.max_cycle = 100
-    cisolver.conv_tol  = 1e-8
+    cisolver.conv_tol  = TOL
+    cisolver.nroots    = 1
     efci0, ci0 = cisolver.kernel(h1e, h2e, nmo, nelecs)
 
     e_err = abs(efci - efci0)
     c_err = abs(1.0 - abs(numpy.einsum('ij,ij->', ci, ci0)))
-    assert e_err < 1e-8
-    assert c_err < 1e-8
+    assert e_err < TOL
+    assert c_err < TOL
 
 def test_random():
     numpy.random.seed(12)
@@ -62,30 +66,30 @@ def test_random():
     for norb in range(2, 6):
         for neleca in range(1, norb + 1):
             for nelecb in range(1, norb + 1):
+
                 nelecs = (neleca, nelecb)
 
                 h1e = numpy.random.random((norb, norb))
                 h2e = numpy.random.random((norb, norb, norb, norb))
                 
-                # Restore permutation symmetry
                 h1e = h1e + h1e.T
                 h2e = h2e + h2e.transpose(1, 0, 2, 3)
                 h2e = h2e + h2e.transpose(0, 1, 3, 2)
                 h2e = h2e + h2e.transpose(2, 3, 0, 1)
 
-                efci, ci = kernel(h1e, h2e, norb, nelecs, method="slater-condon")
+                efci, ci = kernel(h1e, h2e, norb, nelecs, nroots=1, tol=TOL, method="slater-condon")
 
                 cisolver = pyscf.fci.direct_spin1.FCI()
-                cisolver.verbose = 5
-                cisolver.max_cycle = 500
-                cisolver.conv_tol  = 1e-10
+                cisolver.max_cycle = 100
+                cisolver.conv_tol  = TOL
+                cisolver.nroots    = 1
                 efci0, ci0 = cisolver.kernel(h1e, h2e, norb, nelecs)
 
                 e_err = abs(efci - efci0)
                 c_err = abs(1.0 - abs(numpy.einsum('ij,ij->', ci, ci0)))
 
-                assert e_err < 1e-6
-                assert c_err < 1e-6
+                assert e_err < TOL
+                assert c_err < TOL
 
 if __name__ == '__main__':
     test_h6()
