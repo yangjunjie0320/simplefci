@@ -8,7 +8,7 @@ from utils import comb
 from pyscf.fci import cistring
 from pyscf.fci import fci_slow
 
-def _contract_h1e(h1e, c, norb, nelecs):
+def _contract_h1e(h1e, h2e, c, norb, nelecs):
     na, nb         = c.shape
     neleca, nelecb = nelecs
 
@@ -24,51 +24,37 @@ def _contract_h1e(h1e, c, norb, nelecs):
         for a, i, str1, sign in tab:
             t1[a,i,:,str1] += sign * c[:,str0]
 
-    h1e_c = numpy.dot(h1e.reshape(-1), t1.reshape(-1,na*nb))
+    return numpy.einsum('pq,pqJI->JI', h1e, t1, optimize=True)
 
-    return h1e_c.reshape(na, nb)
-
-
-def _contract_h2e(h2e, c, norb, nelecs):
+def _contract_h2e(h1e, h2e, c, norb, nelecs):
     na, nb         = c.shape
     neleca, nelecb = nelecs
 
-    t1  = numpy.zeros((norb, norb, na, nb))
-    link_index_alph = cistring.gen_linkstr_index(range(norb), neleca)
-    link_index_beta = cistring.gen_linkstr_index(range(norb), nelecb)
-
-    for str0, tab in enumerate(link_index_alph):
+    link_indexa = cistring.gen_linkstr_index(range(norb), neleca)
+    link_indexb = cistring.gen_linkstr_index(range(norb), nelecb)
+    na = cistring.num_strings(norb, neleca)
+    nb = cistring.num_strings(norb, nelecb)
+    ci0 = c.reshape(na,nb)
+    t1 = numpy.zeros((norb,norb,na,nb))
+    for str0, tab in enumerate(link_indexa):
         for a, i, str1, sign in tab:
-            t1[a,i,str1] += sign * c[str0]
-
-    for str0, tab in enumerate(link_index_beta):
+            t1[a,i,str1] += sign * ci0[str0]
+    for str0, tab in enumerate(link_indexb):
         for a, i, str1, sign in tab:
-            t1[a,i,:,str1] += sign * c[:,str0]
+            t1[a,i,:,str1] += sign * ci0[:,str0]
 
-    t1 = numpy.einsum('pqrs,rsIJ->pqIJ', h2e, t1, optimize=True)
+    from pyscf import lib
+    t1 = lib.einsum('bjai,aiAB->bjAB', h2e.reshape([norb]*4), t1)
 
-    h2e_c = numpy.zeros_like(c)
-    for str0, tab in enumerate(link_index_alph):
+    fcinew = numpy.zeros_like(ci0)
+    for str0, tab in enumerate(link_indexa):
         for a, i, str1, sign in tab:
-            h2e_c[str1] += sign * t1[a,i,str0]
-
-    for str0, tab in enumerate(link_index_beta):
+            fcinew[str1] += sign * t1[a,i,str0]
+    for str0, tab in enumerate(link_indexb):
         for a, i, str1, sign in tab:
-            h2e_c[:,str1] += sign * t1[a,i,:,str0]
+            fcinew[:,str1] += sign * t1[a,i,:,str0]
 
-    return h2e_c.reshape(na, nb)
-
-def absorb_h1e(h1e, eri, norb, nelec, fac=1):
-    from pyscf import ao2mo
-    if not isinstance(nelec, (int, numpy.integer)):
-        nelec = sum(nelec)
-    h2e = ao2mo.restore(1, eri.copy(), norb)
-    f1e = h1e - numpy.einsum('jiik->jk', h2e) * .5
-    f1e = f1e * (1./(nelec+1e-100))
-    for k in range(norb):
-        h2e[k,k,:,:] += f1e
-        h2e[:,:,k,k] += f1e
-    return h2e * fac
+    return fcinew.reshape(c.shape)
 
 def get_hc_op(h1e, h2e, nmo, nelecs):
     assert h1e.shape == (nmo, nmo)
@@ -78,15 +64,16 @@ def get_hc_op(h1e, h2e, nmo, nelecs):
     na = comb(nmo, neleca)
     nb = comb(nmo, nelecb)
 
-    h = absorb_h1e(h1e, h2e, nmo, nelecs, fac=1)
+    g2e = 0.5 * h2e
+    for k in range(nmo):
+        g2e[k,k,:,:] -= numpy.einsum('jiik->jk', h2e) * (0.25 / (neleca + nelecb + 1e-100))
+        g2e[:,:,k,k] -= numpy.einsum('jiik->jk', h2e) * (0.25 / (neleca + nelecb + 1e-100))
 
     def hh(v):
-        # hc  = _contract_h1e(h1e, v.reshape(na, nb), nmo, nelecs)
-        hc = _contract_h2e(h, v.reshape(na, nb), nmo, nelecs)
-        return hc.reshape(-1)/2
-
-    v0 = numpy.zeros((na*nb, ))
-    v0[0] = 1.0
+        hv  = _contract_h1e(h1e, g2e, v.reshape(na, nb), nmo, nelecs)
+        hv += _contract_h2e(h1e, g2e, v.reshape(na, nb), nmo, nelecs)
+        
+        return hv.reshape(-1)
 
     hc_op = LinearOperator((na*nb, na*nb), matvec=hh)
 

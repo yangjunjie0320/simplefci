@@ -33,7 +33,6 @@ def test_h6():
     cisolver.nroots    = 1
     efci0, ci0 = cisolver.kernel(h1e, h2e, nmo, nelecs)
 
-    print(efci, efci0)
     e_err = abs(efci - efci0)
     c_err = abs(1.0 - abs(numpy.einsum('ij,ij->', ci, ci0)))
     assert e_err < 1e-8
