@@ -8,7 +8,7 @@ from utils import comb
 from pyscf.fci import cistring
 from pyscf.fci import fci_slow
 
-def _contract_h1e(h1e, h2e, c, norb, nelecs):
+def _contract_h1e(h1e, c, norb, nelecs):
     na, nb         = c.shape
     neleca, nelecb = nelecs
 
@@ -26,7 +26,7 @@ def _contract_h1e(h1e, h2e, c, norb, nelecs):
 
     return numpy.einsum('pq,pqJI->JI', h1e, t1, optimize=True)
 
-def _contract_h2e(h1e, h2e, c, norb, nelecs):
+def _contract_h2e(h2e, c, norb, nelecs):
     na, nb         = c.shape
     neleca, nelecb = nelecs
 
@@ -70,8 +70,8 @@ def get_hc_op(h1e, h2e, nmo, nelecs):
         g2e[:,:,k,k] -= numpy.einsum('jiik->jk', h2e) * (0.25 / (neleca + nelecb + 1e-100))
 
     def hh(v):
-        hv  = _contract_h1e(h1e, g2e, v.reshape(na, nb), nmo, nelecs)
-        hv += _contract_h2e(h1e, g2e, v.reshape(na, nb), nmo, nelecs)
+        hv  = _contract_h1e(h1e, v.reshape(na, nb), nmo, nelecs)
+        hv += _contract_h2e(g2e, v.reshape(na, nb), nmo, nelecs)
         
         return hv.reshape(-1)
 
