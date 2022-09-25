@@ -24,39 +24,59 @@ def _contract_h1e(h1e, c, norb, nelecs):
         for a, i, str1, sign in tab:
             t1[a,i,:,str1] += sign * c[:,str0]
 
-    return numpy.einsum('pq,pqJI->JI', h1e, t1, optimize=True)
+    h1e_c = numpy.einsum('pq,pqJI->JI', h1e, t1, optimize=True)
+    return h1e_c
 
-def _contract_h2e(h2e, c, norb, nelecs):
+def _contract_h2e(g2e, c, norb, nelecs):
     na, nb         = c.shape
     neleca, nelecb = nelecs
 
-    link_indexa = cistring.gen_linkstr_index(range(norb), neleca)
-    link_indexb = cistring.gen_linkstr_index(range(norb), nelecb)
-    na = cistring.num_strings(norb, neleca)
-    nb = cistring.num_strings(norb, nelecb)
-    ci0 = c.reshape(na,nb)
-    t1 = numpy.zeros((norb,norb,na,nb))
-    for str0, tab in enumerate(link_indexa):
-        for a, i, str1, sign in tab:
-            t1[a,i,str1] += sign * ci0[str0]
-    for str0, tab in enumerate(link_indexb):
-        for a, i, str1, sign in tab:
-            t1[a,i,:,str1] += sign * ci0[:,str0]
+    t1  = numpy.zeros((norb, norb, na, nb))
+    link_index_alph = cistring.gen_linkstr_index(range(norb), neleca)
+    link_index_beta = cistring.gen_linkstr_index(range(norb), nelecb)
 
-    from pyscf import lib
-    t1 = lib.einsum('bjai,aiAB->bjAB', h2e.reshape([norb]*4), t1)
-
-    fcinew = numpy.zeros_like(ci0)
-    for str0, tab in enumerate(link_indexa):
+    for str0, tab in enumerate(link_index_alph):
         for a, i, str1, sign in tab:
-            fcinew[str1] += sign * t1[a,i,str0]
-    for str0, tab in enumerate(link_indexb):
-        for a, i, str1, sign in tab:
-            fcinew[:,str1] += sign * t1[a,i,:,str0]
+            t1[a,i,str1] += sign * c[str0]
 
-    return fcinew.reshape(c.shape)
+    for str0, tab in enumerate(link_index_beta):
+        for a, i, str1, sign in tab:
+            t1[a,i,:,str1] += sign * c[:,str0]
+
+    t1 = numpy.einsum('bjai,aiAB->bjAB', g2e, t1, optimize=True)
+
+    h2e_c = numpy.zeros_like(c)
+    for str0, tab in enumerate(link_index_alph):
+        for a, i, str1, sign in tab:
+            h2e_c[str1] += sign * t1[a,i,str0]
+
+    for str0, tab in enumerate(link_index_beta):
+        for a, i, str1, sign in tab:
+            h2e_c[:,str1] += sign * t1[a,i,:,str0]
+
+    return h2e_c
 
 def get_hc_op(h1e, h2e, nmo, nelecs):
+    '''Generate the linear operator for the FCI matrix vector product.
+    Will be passed to scipy.sparse.linalg.eigsh as the sparse matrix
+    multiplication operator.
+
+    Parameters
+    ----------
+    h1e : numpy.ndarray
+        One-electron Hamiltonian.
+    h2e : numpy.ndarray
+        Two-electron Hamiltonian.
+    nmo : int
+        Number of molecular orbitals.
+    nelecs : tuple
+        Number of alpha and beta electrons.
+
+    Returns
+    ----------
+    hc_op : scipy.sparse.linalg.LinearOperator
+        Linear operator for the FCI matrix vector product.
+    '''
     assert h1e.shape == (nmo, nmo)
     assert h2e.shape == (nmo, nmo, nmo, nmo)
 
@@ -69,12 +89,12 @@ def get_hc_op(h1e, h2e, nmo, nelecs):
         g2e[k,k,:,:] -= numpy.einsum('jiik->jk', h2e) * (0.25 / (neleca + nelecb + 1e-100))
         g2e[:,:,k,k] -= numpy.einsum('jiik->jk', h2e) * (0.25 / (neleca + nelecb + 1e-100))
 
-    def hh(v):
+    def matvec(v):
         hv  = _contract_h1e(h1e, v.reshape(na, nb), nmo, nelecs)
         hv += _contract_h2e(g2e, v.reshape(na, nb), nmo, nelecs)
         
         return hv.reshape(-1)
 
-    hc_op = LinearOperator((na*nb, na*nb), matvec=hh)
+    hc_op = LinearOperator((na*nb, na*nb), matvec=matvec)
 
     return hc_op
