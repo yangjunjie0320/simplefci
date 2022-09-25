@@ -3,24 +3,21 @@
 ## Introduction
 
 A simple FCI (full configuration interaction) implementation in Python.
-Use the Slater-Condon rule to evaluate the Hamiltonian within the Slater 
-determinant basis ($S_z$ eigen states), with the MOs and integrals generated
-from `pyscf`; then directly diagonalize it using `numpy`.
+- Slater-Condon rule to evaluate the Hamiltonian matrix within the Slater 
+determinant basis ( $ S_z $ eigen states), and diagonalize the Hamiltonian matrix
+with the condense eigensolver in `scipy`.
+- The “string-based” determinant-CI (or direct-CI) algorithm to generate the
+matrix multiplication of the Hamiltonian matrix and use the sparse eigensolver
+in `scipy` to diagonalize the Hamiltonian matrix.
+
+In the tests, MOs and integrals are generated from `pyscf`.
 
 ## TODO:
 
-- A faster and more technical implementation, the so-called “string-based” 
-determinant-CI (or direct-CI) algorithm.
 - Davidson algorithm for matrix diagonalization and implement it for any 
 symmetric matrix.
-- Knowles and Handy’s paper (1984).
-- Implement functions to handle the FCI string, then 
-the $\mathbf{H} \mathbf{C}$ operation.
-- Put everything together. Davidson diagonalization solver;
-preconditioner (can be taken from your program in the previsou step);
-$\mathbf{H} \mathbf{C}$ operation, debug and tests.
 
-If the programs are completely written in Python, it should be able to solve 
+As the programs are completely written in Python, it should be able to solve 
 problem with a maximum system size of ∼ 12 orbitals with 12 electrons.
 
 ## Acknowledgements
