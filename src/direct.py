@@ -98,3 +98,4 @@ def get_hc_op(h1e, h2e, nmo, nelecs):
     hc_op = LinearOperator((na*nb, na*nb), matvec=matvec)
 
     return hc_op
+
