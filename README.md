@@ -4,8 +4,8 @@
 
 A simple FCI (full configuration interaction) implementation in Python.
 - Slater-Condon rule to evaluate the Hamiltonian matrix within the Slater 
-determinant basis ( $ S_z $ eigen states), and diagonalize the Hamiltonian matrix
-with the condense eigensolver in `scipy`.
+determinant basis ( $\hat{S}_z$ eigen states), and diagonalize the Hamiltonian
+ matrix with the condense eigensolver in `scipy`.
 - The “string-based” determinant-CI (or direct-CI) algorithm to generate the
 matrix multiplication of the Hamiltonian matrix and use the sparse eigensolver
 in `scipy` to diagonalize the Hamiltonian matrix.
